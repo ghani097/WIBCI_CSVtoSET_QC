@@ -143,7 +143,7 @@ Converted files are in standard EEGLAB format (.set/.fdt) containing:
 - Metadata (sampling rate, channel names, etc.)
 
 ### Missing Data Handling
-WiBCI uses WiFi for wireless data transmission, which may occasionally result in missing packets. The converter:
+WiBCI uses Wi-Fi for wireless data transmission, which may occasionally result in missing packets. The converter:
 1. Automatically detects missing packets
 2. Reports the percentage of missing data
 3. Fills missing packets using MATLAB's `fillmissing` function with pchip interpolation (default)
@@ -232,7 +232,7 @@ fprintf('Number of NaN values: %d\n', nan_count);
 **Solution:** The wibci2eeglab function automatically ignores non-EEGLAB channels. Check the warning message to see which channels were ignored.
 
 ### Issue: "Large percentage of missing data reported"
-**Solution:** This is normal for WiBCI data due to WiFi transmission limitations. The converter automatically fills missing packets using pchip interpolation. If you prefer to handle missing data manually, use `wibci2eeglab(filePath, 0)` to keep NaNs.
+**Solution:** This is normal for WiBCI data due to Wi-Fi transmission limitations. The converter automatically fills missing packets using pchip interpolation. If you prefer to handle missing data manually, use `wibci2eeglab(filePath, 0)` to keep NaNs.
 
 ### Issue: "EEGLAB functions not found"
 **Solution:** Ensure EEGLAB is properly installed and added to MATLAB path. Run `eeglab;` to start EEGLAB before using conversion functions.
