@@ -1314,33 +1314,76 @@ function [EEG, metrics] = qcProcessSingleFile(fig, EEG)
         qcSetStatus(fig, 'Running ASR...');
 
         asrCutoff = str2double(get(findobj(fig, 'Tag', 'qcASRCutoff'), 'String'));
-
-        % Try different ASR methods
         asrSuccess = false;
 
-        % Method 1: Try clean_asr directly (preferred)
-        if exist('clean_asr', 'file') == 2 && ~asrSuccess
+        % Ensure EEG data is double precision
+        EEG.data = double(EEG.data);
+
+        % Ensure EEG has required fields for ASR
+        if ~isfield(EEG, 'chaninfo') || isempty(EEG.chaninfo)
+            EEG.chaninfo = struct('nosedir', '+X', 'plotrad', 0.5, 'shrink', []);
+        end
+        if ~isfield(EEG, 'ref') || isempty(EEG.ref)
+            EEG.ref = 'common';
+        end
+
+        % Check which ASR functions are available
+        hasCleanAsr = exist('clean_asr', 'file') == 2;
+        hasCleanRawdata = exist('clean_rawdata', 'file') == 2;
+        hasPopCleanRawdata = exist('pop_clean_rawdata', 'file') == 2;
+        hasCleanArtifacts = exist('clean_artifacts', 'file') == 2;
+
+        qcLog(fig, sprintf('    Available: clean_asr=%d, clean_rawdata=%d, pop_clean_rawdata=%d', ...
+            hasCleanAsr, hasCleanRawdata, hasPopCleanRawdata));
+
+        % Method 1: Try pop_clean_rawdata (EEGLAB GUI wrapper - most reliable)
+        if hasPopCleanRawdata && ~asrSuccess
             try
-                qcLog(fig, '    Using clean_asr...');
-                EEG.data = double(EEG.data);  % Ensure double precision
+                qcLog(fig, '    Trying pop_clean_rawdata...');
+                origData = EEG.data;
+                EEG = pop_clean_rawdata(EEG, ...
+                    'FlatlineCriterion', 'off', ...
+                    'ChannelCriterion', 'off', ...
+                    'LineNoiseCriterion', 'off', ...
+                    'Highpass', 'off', ...
+                    'BurstCriterion', asrCutoff, ...
+                    'WindowCriterion', 'off', ...
+                    'BurstRejection', 'off', ...
+                    'Distance', 'Euclidian');
+                % Verify data actually changed
+                if ~isequal(size(origData), size(EEG.data)) || max(abs(origData(:) - EEG.data(:))) > 1e-10
+                    asrSuccess = true;
+                    qcLog(fig, sprintf('    ASR applied via pop_clean_rawdata (cutoff: %d)', asrCutoff));
+                else
+                    qcLog(fig, '    pop_clean_rawdata: data unchanged');
+                end
+            catch ME
+                qcLog(fig, sprintf('    pop_clean_rawdata failed: %s', ME.message));
+            end
+        end
+
+        % Method 2: Try clean_asr directly
+        if hasCleanAsr && ~asrSuccess
+            try
+                qcLog(fig, '    Trying clean_asr...');
+                origData = EEG.data;
                 EEG = clean_asr(EEG, asrCutoff);
-                asrSuccess = true;
-                qcLog(fig, sprintf('    ASR applied (cutoff: %d)', asrCutoff));
+                if ~isequal(size(origData), size(EEG.data)) || max(abs(origData(:) - EEG.data(:))) > 1e-10
+                    asrSuccess = true;
+                    qcLog(fig, sprintf('    ASR applied via clean_asr (cutoff: %d)', asrCutoff));
+                else
+                    qcLog(fig, '    clean_asr: data unchanged');
+                end
             catch ME
                 qcLog(fig, sprintf('    clean_asr failed: %s', ME.message));
             end
         end
 
-        % Method 2: Try clean_rawdata with ASR only
-        if exist('clean_rawdata', 'file') == 2 && ~asrSuccess
+        % Method 3: Try clean_rawdata with numeric parameters
+        if hasCleanRawdata && ~asrSuccess
             try
-                qcLog(fig, '    Using clean_rawdata...');
-                EEG.data = double(EEG.data);  % Ensure double precision
-
-                % Store original data size
-                origPnts = EEG.pnts;
-
-                % Run clean_rawdata with only burst correction (ASR)
+                qcLog(fig, '    Trying clean_rawdata...');
+                origData = EEG.data;
                 EEG = clean_rawdata(EEG, ...
                     'FlatlineCriterion', -1, ...
                     'ChannelCriterion', -1, ...
@@ -1350,19 +1393,22 @@ function [EEG, metrics] = qcProcessSingleFile(fig, EEG)
                     'WindowCriterion', -1, ...
                     'BurstRejection', 'off', ...
                     'Distance', 'Euclidian');
-
-                asrSuccess = true;
-                qcLog(fig, sprintf('    ASR applied via clean_rawdata (cutoff: %d)', asrCutoff));
+                if ~isequal(size(origData), size(EEG.data)) || max(abs(origData(:) - EEG.data(:))) > 1e-10
+                    asrSuccess = true;
+                    qcLog(fig, sprintf('    ASR applied via clean_rawdata (cutoff: %d)', asrCutoff));
+                else
+                    qcLog(fig, '    clean_rawdata: data unchanged');
+                end
             catch ME
                 qcLog(fig, sprintf('    clean_rawdata failed: %s', ME.message));
             end
         end
 
-        % Method 3: Try vis_artifacts approach (alternative)
-        if exist('clean_artifacts', 'file') == 2 && ~asrSuccess
+        % Method 4: Try clean_artifacts
+        if hasCleanArtifacts && ~asrSuccess
             try
-                qcLog(fig, '    Using clean_artifacts...');
-                EEG.data = double(EEG.data);
+                qcLog(fig, '    Trying clean_artifacts...');
+                origData = EEG.data;
                 EEG = clean_artifacts(EEG, ...
                     'FlatlineCriterion', 'off', ...
                     'ChannelCriterion', 'off', ...
@@ -1370,8 +1416,12 @@ function [EEG, metrics] = qcProcessSingleFile(fig, EEG)
                     'Highpass', 'off', ...
                     'BurstCriterion', asrCutoff, ...
                     'WindowCriterion', 'off');
-                asrSuccess = true;
-                qcLog(fig, sprintf('    ASR applied via clean_artifacts (cutoff: %d)', asrCutoff));
+                if ~isequal(size(origData), size(EEG.data)) || max(abs(origData(:) - EEG.data(:))) > 1e-10
+                    asrSuccess = true;
+                    qcLog(fig, sprintf('    ASR applied via clean_artifacts (cutoff: %d)', asrCutoff));
+                else
+                    qcLog(fig, '    clean_artifacts: data unchanged');
+                end
             catch ME
                 qcLog(fig, sprintf('    clean_artifacts failed: %s', ME.message));
             end
@@ -1381,8 +1431,9 @@ function [EEG, metrics] = qcProcessSingleFile(fig, EEG)
             metrics.asrApplied = true;
             metrics.asrCutoff = asrCutoff;
         else
-            qcLog(fig, '    WARNING: All ASR methods failed. Is clean_rawdata plugin installed?');
-            qcLog(fig, '    Install via EEGLAB: File > Manage EEGLAB extensions > clean_rawdata');
+            qcLog(fig, '    WARNING: All ASR methods failed or data unchanged.');
+            qcLog(fig, '    Make sure clean_rawdata plugin is installed in EEGLAB:');
+            qcLog(fig, '    File > Manage EEGLAB extensions > clean_rawdata');
             metrics.asrApplied = false;
         end
     end
