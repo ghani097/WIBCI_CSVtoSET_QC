@@ -18,7 +18,9 @@ This repository provides tools for processing EEG data from the WiBCI (Wireless 
 - **Configurable channel selection** - Choose which EEG channels to include (default: 10 channels from 16-channel montage)
 - **Channel renaming** - Customize channel names if needed
 - **Automatic missing packet handling** - Detects and fills missing data packets using MATLAB's `fillmissing` function with pchip interpolation
-- **Event/trigger preservation** - Maintains software and hardware trigger events (ST A/B, HT A/B)
+- **Selectable trigger import** - Choose whether to include triggers and which event columns (A and/or B) to import
+- **Rising-edge event detection** - Detects trigger onsets instead of every trigger sample
+- **Event/trigger preservation** - Maintains software and hardware trigger events (ST A/B, HT A/B) and stores the numeric trigger code on each imported event
 - **Progress tracking** - Real-time status display during conversion
 - **Organized output** - Saves .set files to SET_files folder in data directory
 
@@ -29,6 +31,7 @@ This repository provides tools for processing EEG data from the WiBCI (Wireless 
 - **IC visualization** - View independent component topoplots, activity, and spectra
 - **Batch reporting** - Export quality metrics to Excel for multiple files
 - **Data cleaning** - Save cleaned datasets after preprocessing
+- **ERP workflow** - Optional GEDAI cleaning + ERP averaging GUI via `WIBCI_ERP_GUI.m`
 
 ## Requirements
 
@@ -82,10 +85,11 @@ WIBCI_Converter_GUI()
 **Tab 1 - Converter:**
 1. Click "Single File" to select one CSV file, or "Folder" for batch processing
 2. Configure channel selection if needed (default: 10 standard channels)
-3. Rename channels if desired
-4. Click "Convert" to start conversion
-5. Monitor progress in the log window
-6. Output .set files are saved to `SET_files` folder in the data directory
+3. Optionally enable trigger import and choose Event A / Event B
+4. Rename channels if desired
+5. Click "Convert" to start conversion
+6. Monitor progress in the log window
+7. Output .set files are saved to `SET_files` folder in the data directory
 
 **Tab 2 - Quality Check:**
 1. Load single or multiple .set files
@@ -114,6 +118,15 @@ pop_eegplot(EEG, 1, 1, 1);
 % Save as EEGLAB dataset
 pop_saveset(EEG, 'filename', 'my_eeg_data.set', 'filepath', 'C:\output\');
 ```
+
+### Method 3: GEDAI Cleaning + ERP GUI
+
+```matlab
+cd MAIN_Pipeline
+WIBCI_ERP_GUI
+```
+
+This companion GUI supports GEDAI-based cleaning for `.set` files and ERP averaging for Easy / Medium / Hard task conditions.
 
 #### Experiment A Data:
 For data saved with "Experiment A" montage:
@@ -160,7 +173,8 @@ WIBCI_CSVtoSET_QC/
 │   ├── loadWiBCIData_UG.m      # Data loading function
 │   ├── loadExperimentAFile.m   # Experiment A data loader
 │   ├── quickViewExperimentAFile.m  # Quick visualization
-│   ├── eegLabEventStructW.m    # Event structure builder
+│   ├── eegLabEventStructW.m    # Event structure builder with trigger-code support
+│   ├── WIBCI_ERP_GUI.m         # GEDAI cleaning + ERP analysis GUI
 │   ├── strcmpIND.m             # String comparison utility
 │   └── Example Data/           # Sample CSV files
 │       ├── experimentA.csv

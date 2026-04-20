@@ -32,12 +32,18 @@ eegChannels                     = loadedData.channelNames([4 6 7 8 10 11 12 14 1
 electrodeSetupAscFile           = fullfile(fileparts(which('eeglab')), 'functions', 'supportfiles', 'Standard-10-5-Cap385.sfp');
 locFile                         = readlocs(electrodeSetupAscFile);
 
-%% Prepare event vector
-softEventAVector                = find(eventData(:, 1) >= 100);
-softEventBVector                = find(eventData(:, 2) >= 100);
+%% Prepare event vector — rising-edge detection for trigger onsets
+softEventAVector                = find(diff([0; eventData(:, 1) >= 100]) == 1);
+softEventBVector                = find(diff([0; eventData(:, 2) >= 100]) == 1);
 
-hardEventAVector                = find((eventData(:, 1) == 1) | (eventData(:, 1) == 101));
-hardEventBVector                = find((eventData(:, 2) == 1) | (eventData(:, 2) == 101));
+hardEventAVector                = find(diff([0; (eventData(:, 1) >= 1) & (eventData(:, 1) < 100)]) == 1);
+hardEventBVector                = find(diff([0; (eventData(:, 2) >= 1) & (eventData(:, 2) < 100)]) == 1);
+
+%% Extract numeric code values at each event onset sample
+softEventACodes                 = eventData(softEventAVector, 1);
+softEventBCodes                 = eventData(softEventBVector, 2);
+hardEventACodes                 = eventData(hardEventAVector, 1);
+hardEventBCodes                 = eventData(hardEventBVector, 2);
 
 %% Ignore Non-eeglab channles
 includedChannels = strcmpIND(eegChannels, transpose({locFile(:).labels}));
@@ -79,8 +85,9 @@ EEG.chanlocs                    = chanLocs;
 EEG.urchanlocs                  = urChanLocs;
 EEG.chaninfo                    = [];
 EEG.ref                         = 'common';
-EEG.event                       = eegLabEventStructW(softEventAVector, softEventBVector, hardEventAVector, hardEventBVector);
-EEG.urevent                     = eegLabEventStructW(softEventAVector, softEventBVector, hardEventAVector, hardEventBVector);
+EEG.event                       = eegLabEventStructW(softEventAVector, softEventBVector, hardEventAVector, hardEventBVector, ...
+                                                     softEventACodes, softEventBCodes, hardEventACodes, hardEventBCodes);
+EEG.urevent                     = EEG.event;
 EEG.eventdescription            = {};
 EEG.epoch                       = [];
 EEG.epochdescription            = {};
